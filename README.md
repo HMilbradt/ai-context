@@ -1,6 +1,6 @@
 # ai-context
 
-Personal AI context: instructions, skills, prompts, subagents, slash commands, and settings snippets for AI coding tools (Claude Code, Cursor, Copilot, etc.).
+Personal AI context: skills, prompts, subagents, slash commands, and settings for AI coding tools (Claude Code, Cursor, Copilot, etc.).
 
 Skills follow the [Vercel Agent Skills](https://vercel.com/docs/agent-resources/skills) spec, so the whole repo is installable with one command.
 
@@ -22,14 +22,13 @@ Works with Claude Code, GitHub Copilot, Cursor, Cline, and any agent the `skills
 
 ## Layout
 
-| Folder          | Purpose                                                                 |
-| --------------- | ----------------------------------------------------------------------- |
-| `instructions/` | Global instruction blocks. Paste into root `CLAUDE.md`, Claude app, Cursor rules, etc. |
-| `skills/`       | Installable skills (`SKILL.md` per skill). Vercel-compatible.           |
-| `prompts/`      | Reusable prompt snippets. Plain markdown, drop in anywhere.             |
-| `agents/`       | Subagent definitions in Claude Code format (frontmatter + system prompt). |
-| `commands/`     | Slash commands in Claude Code format.                                   |
-| `settings/`     | Shareable `settings.json` snippets, hook scripts, permission allowlists. |
+| Folder       | Purpose                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
+| `skills/`    | Installable skills (`SKILL.md` per skill). Vercel-compatible.           |
+| `prompts/`   | Reusable prompt snippets. Plain markdown, drop in anywhere.             |
+| `agents/`    | Subagent definitions in Claude Code format (frontmatter + system prompt). |
+| `commands/`  | Slash commands in Claude Code format.                                   |
+| `settings/`  | Global personalization (markdown) and Claude Code config snippets (JSON, hooks, permissions). |
 
 Each folder has its own `README.md` with conventions and examples.
 
