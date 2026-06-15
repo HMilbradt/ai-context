@@ -8,6 +8,9 @@ metadata:
     - https://developers.cloudflare.com/d1/
     - https://developers.cloudflare.com/durable-objects/
     - https://developers.cloudflare.com/queues/
+    - https://developers.cloudflare.com/r2/
+    - https://developers.cloudflare.com/turnstile/
+    - https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/
     - https://better-auth.com/docs/concepts/database
     - https://better-auth.com/docs/plugins/organization
     - https://turborepo.dev/docs
@@ -30,10 +33,15 @@ retrieval:
     - React
     - MobX
     - IndexedDB
+    - Better Auth
+    - Turborepo
     - Cloudflare Workers
     - Cloudflare D1
     - Cloudflare Durable Objects
     - Cloudflare Queues
+    - Cloudflare R2
+    - Cloudflare Turnstile
+    - Cloudflare Access
     - ShadCN
     - Base UI
 ---
@@ -47,23 +55,44 @@ Build a two-zone React application:
 - Marketing zone: prerendered static HTML and assets for SEO.
 - Application zone: client-only dashboard shell with MobX, IndexedDB, optimistic writes, and background sync.
 
-Use D1 for app-owned auth data and the canonical relational application database. Choose the rest of the Cloudflare resources by product need. Workers and Static Assets are the default runtime and delivery layer, Durable Objects are appropriate for realtime coordination, and Queues are appropriate for async side effects. Do not force a Cloudflare service into the design when the product requirement does not need it.
+Use [D1](https://developers.cloudflare.com/d1/) for app-owned auth data and canonical relational app data. Choose the rest of the Cloudflare resources by product need. [Workers](https://developers.cloudflare.com/workers/) and [Static Assets](https://developers.cloudflare.com/workers/static-assets/) are the default runtime and delivery layer. [Durable Objects](https://developers.cloudflare.com/durable-objects/) and [Queues](https://developers.cloudflare.com/queues/) are conditional.
+
+## Companion Skill
+
+When implementing performance-sensitive UI, also apply [`performance-first-app-builder`](../performance-first-app-builder/SKILL.md) if available.
+
+Use this skill for architecture, infrastructure, auth, organization, routing, and app shape. Use `performance-first-app-builder` for performance, startup, rendering, instrumentation, and perceived latency.
 
 ## Source Freshness
 
 Before relying on API signatures, compatibility flags, limits, or framework support, check current primary docs:
 
-- Cloudflare Workers Static Assets.
-- Cloudflare D1 Workers Binding API.
-- Cloudflare Durable Objects WebSockets and storage.
-- Cloudflare Queues JavaScript APIs.
-- Better Auth database adapters and organization plugin.
-- Turborepo workspace configuration.
-- MobX React integration.
-- ShadCN theming.
-- Base UI component APIs.
+- [Cloudflare Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/).
+- [Cloudflare D1 Workers Binding API](https://developers.cloudflare.com/d1/worker-api/).
+- [Cloudflare Durable Objects WebSockets and storage](https://developers.cloudflare.com/durable-objects/best-practices/websockets/).
+- [Cloudflare Queues JavaScript APIs](https://developers.cloudflare.com/queues/get-started/).
+- [Cloudflare R2](https://developers.cloudflare.com/r2/), [Turnstile](https://developers.cloudflare.com/turnstile/), and [Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/) when files, bot protection, or internal access are needed.
+- [Better Auth database adapters](https://better-auth.com/docs/concepts/database) and [organization plugin](https://better-auth.com/docs/plugins/organization).
+- [Turborepo workspace configuration](https://turborepo.dev/docs).
+- [MobX React integration](https://mobx.js.org/react-integration.html).
+- [ShadCN docs](https://ui.shadcn.com/docs) and [Base UI quick start](https://base-ui.com/react/overview/quick-start).
 
-If current Cloudflare docs still say React Router prerendering and SPA mode are unsupported with the Cloudflare Vite plugin, do not choose React Router framework mode for this architecture. Use React + Vite with React Router as a client library, or use a separate prerender step for marketing pages.
+If current Cloudflare docs still say React Router prerendering and SPA mode are unsupported with the Cloudflare Vite plugin, do not choose React Router framework mode. Use React + Vite with React Router as a client library, or use a separate prerender step for marketing pages.
+
+## Agent Workflow
+
+Before coding, produce a short architecture note with these decisions:
+
+1. Classify the app as marketing-only, dashboard, collaborative dashboard, or multiplayer app.
+2. Choose the route model and state which routes are prerendered, client-only, API, auth, or sync routes.
+3. Choose Cloudflare resources from the decision table below.
+4. Confirm Better Auth, D1, organizations, personal organization creation, and role or permission strategy.
+5. Establish Turborepo `apps/*` and `packages/*` boundaries.
+6. Define state boundaries for MobX, IndexedDB, D1, and optional realtime.
+7. Confirm SEO behavior for public routes and noindex behavior for dashboard routes.
+8. State where this skill ends and where `performance-first-app-builder` applies.
+
+Do not proceed from stack selection alone. The architecture note is the guardrail.
 
 ## Default Stack
 
@@ -93,9 +122,22 @@ Avoid:
 - Building new UI primitives outside the design system.
 - Starting from a single-package app when the goal is a reusable application framework.
 
+## Cloudflare Resource Decisions
+
+| Need | Use |
+| --- | --- |
+| Relational app data, auth state, organizations, memberships | [D1](https://developers.cloudflare.com/d1/) |
+| Static marketing pages and built assets | [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/) |
+| API, auth, sync, and route control | [Workers](https://developers.cloudflare.com/workers/) |
+| Live presence, WebSockets, serialized per-room or per-organization coordination | [Durable Objects](https://developers.cloudflare.com/durable-objects/) |
+| Async side effects such as email, webhooks, indexing, analytics, cleanup, retries | [Queues](https://developers.cloudflare.com/queues/) |
+| File uploads, avatars, attachments, imports, exports, generated assets | [R2](https://developers.cloudflare.com/r2/) |
+| Bot protection for signup, login, invite acceptance, or abuse-prone forms | [Turnstile](https://developers.cloudflare.com/turnstile/) |
+| Internal-only admin or private preview access | [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/) |
+
 ## Monorepo Structure
 
-Use Turborepo as the default repository shape.
+Use [Turborepo](https://turborepo.dev/docs) as the default repository shape.
 
 Prefer:
 
@@ -137,7 +179,7 @@ Dashboard routes must have:
 
 ## Cloudflare Routing
 
-Configure Workers Static Assets so static marketing files are served directly when possible. Use the Worker for `/api/*`, `/auth/*`, and `/sync/*`.
+Configure [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/) so static marketing files are served directly when possible. Use the [Worker](https://developers.cloudflare.com/workers/) for `/api/*`, `/auth/*`, and `/sync/*`.
 
 Use `not_found_handling = "single-page-application"` only for the dashboard shell or a build where unknown dashboard routes must return the app shell. Pair it with selective `run_worker_first` for API, auth, and sync routes.
 
@@ -150,7 +192,7 @@ Prefer a Worker fetch handler that:
 
 ## State Model
 
-Use MobX for shared domain state, sync state, and high-churn collaborative state.
+Use [MobX](https://mobx.js.org/react-integration.html) for shared domain state, sync state, and high-churn collaborative state.
 
 Create stores by responsibility:
 
@@ -160,7 +202,7 @@ Create stores by responsibility:
 - `PresenceStore`: online collaborators, selections, cursors, transient room state.
 - `UiStore`: persistent shell preferences only when React local state is insufficient.
 
-Wrap components that read observable data with `observer`.
+Wrap components that read observable data with `observer` from `mobx-react-lite`.
 
 Prefer named functions inside `observer` so React hook linting and DevTools names stay useful.
 
@@ -211,7 +253,7 @@ Prefer D1 as the durable authority for committed application state. Use Durable 
 
 ## Server Data Model
 
-Use D1 as the canonical relational database for auth, organizations, memberships, and application data.
+Use [D1](https://developers.cloudflare.com/d1/worker-api/) as the canonical relational database for auth, organizations, memberships, and application data.
 
 Prefer:
 
@@ -225,7 +267,7 @@ Do not prescribe a product data model in this skill. The agent should derive dom
 
 ## Durable Objects
 
-Use Durable Objects only when coordination is actually needed.
+Use [Durable Objects](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) only when coordination is actually needed.
 
 Good fits:
 
@@ -284,7 +326,7 @@ Do not use presence as authorization evidence.
 
 ## Queues
 
-Use Cloudflare Queues only for asynchronous work that does not need to complete before UI feedback:
+Use [Cloudflare Queues](https://developers.cloudflare.com/queues/get-started/) only for asynchronous work that does not need to complete before UI feedback:
 
 - Email.
 - Webhooks.
@@ -301,19 +343,33 @@ Do not queue the primary write path if the user expects immediate collaborative 
 
 ## Authentication
 
-Use Better Auth as the default app-owned authentication layer for customer-facing SaaS.
+Use [Better Auth](https://better-auth.com/docs) as the default app-owned authentication layer for customer-facing SaaS.
+
+Before implementing auth, write a short auth decision record:
+
+- Auth library: Better Auth.
+- Database: D1.
+- Better Auth database path: direct SQLite/D1-capable adapter or Drizzle SQLite adapter when the project standardizes on Drizzle.
+- Organization plugin: enabled.
+- Personal organization: created for every user during onboarding.
+- Membership source of truth: Better Auth organization model.
+- Role model: product-defined and organization-scoped.
+- Permission checks: server-side and mandatory.
+- Client checks: affordance only.
+- Cloudflare Access: internal admin and private preview only.
+- Turnstile: enabled for abuse-prone public auth flows when needed.
 
 Configure Better Auth with:
 
 - D1-backed database storage. Prefer the built-in SQLite/D1-capable path or a Drizzle SQLite adapter when the project standardizes on Drizzle.
-- Organization plugin enabled on server and client.
+- [Organization plugin](https://better-auth.com/docs/plugins/organization) enabled on server and client.
 - HttpOnly, Secure, SameSite cookies.
 - CSRF protection for cookie-authenticated writes.
 - Session rotation on login and privilege changes.
 - Logout that invalidates the server session and clears local IndexedDB data for the affected user and organization.
-- Turnstile on signup, login, invitation acceptance, or passwordless email request flows when bot abuse is plausible.
+- [Turnstile](https://developers.cloudflare.com/turnstile/) on signup, login, invitation acceptance, or passwordless email request flows when bot abuse is plausible.
 
-Use Cloudflare Access for internal admin surfaces or private preview environments, not as the default customer auth system.
+Use [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/) for internal admin surfaces or private preview environments, not as the default customer auth system.
 
 Do not create bespoke session, membership, invitation, or role systems unless Better Auth cannot satisfy a documented requirement.
 
@@ -334,7 +390,7 @@ Do not hard-code a universal role list in this skill. Instead:
 
 - Define roles and permissions from the product domain.
 - Keep roles organization-scoped.
-- Use Better Auth organization access control for static role sets.
+- Use [Better Auth organization access control](https://better-auth.com/docs/plugins/organization) for static role sets.
 - Consider Better Auth dynamic access control only when the product needs organization-specific custom roles.
 - Keep server-side permission checks authoritative. Client checks are for affordances only.
 
@@ -358,7 +414,7 @@ Never silently overwrite another user's protected change.
 
 ## UI System
 
-Use ShadCN as the owned component distribution pattern and Base UI for accessible headless primitives.
+Use [ShadCN](https://ui.shadcn.com/docs) as the owned component distribution pattern and [Base UI](https://base-ui.com/react/overview/quick-start) for accessible headless primitives.
 
 Rules:
 
@@ -421,6 +477,10 @@ Generate:
 
 Before finishing, confirm the architecture follows the guide:
 
+- The agent produced an architecture note before coding.
+- The architecture note classifies the app and records route, Cloudflare resource, auth, organization, monorepo, state, SEO, and performance-skill decisions.
+- The Cloudflare resource choices follow the resource decision table.
+- The auth decision record exists and chooses Better Auth, D1, organization plugin, personal organizations, and server-side permission checks.
 - The repository is a Turborepo monorepo with clear `apps/*` and `packages/*` boundaries.
 - D1 is the chosen store for auth, organizations, memberships, and canonical relational app data.
 - Better Auth owns sessions, organizations, invitations, membership, and role or permission checks.
@@ -432,5 +492,6 @@ Before finishing, confirm the architecture follows the guide:
 - IndexedDB state is local-only, scoped by user and organization, and contains no auth secrets.
 - MobX stores are organized by session, domain, sync, presence, and UI responsibilities.
 - ShadCN/Base UI components are token-based and can be rethemed without component rewrites.
+- `performance-first-app-builder` is applied or explicitly ruled out for the task.
 
 Report important deviations and why they were chosen.
