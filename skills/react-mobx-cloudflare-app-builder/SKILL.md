@@ -1,6 +1,6 @@
 ---
 name: react-mobx-cloudflare-app-builder
-description: Build React applications on Cloudflare with MobX, IndexedDB sync, Durable Objects multiplayer, D1 persistence, Queues for async work, app-owned authentication, SEO-friendly prerendered marketing pages, client-only dashboard routes, and ShadCN/Base UI token-based styling. Use when creating or revising a Linear-style local-first SaaS, dashboard, collaborative app, or Cloudflare-native React app.
+description: Build React applications in a Turborepo monorepo on Cloudflare with MobX, IndexedDB local state, D1-backed auth and persistence, organization-first authorization, SEO-friendly prerendered marketing pages, client-only dashboard routes, and ShadCN/Base UI token-based styling. Use when creating or revising a Linear-style local-first SaaS, dashboard, collaborative app, or Cloudflare-native React app.
 metadata:
   priority: 8
   docs:
@@ -8,6 +8,9 @@ metadata:
     - https://developers.cloudflare.com/d1/
     - https://developers.cloudflare.com/durable-objects/
     - https://developers.cloudflare.com/queues/
+    - https://better-auth.com/docs/concepts/database
+    - https://better-auth.com/docs/plugins/organization
+    - https://turborepo.dev/docs
     - https://mobx.js.org/react-integration.html
     - https://ui.shadcn.com/docs
     - https://base-ui.com/react/overview/quick-start
@@ -44,7 +47,7 @@ Build a two-zone React application:
 - Marketing zone: prerendered static HTML and assets for SEO.
 - Application zone: client-only dashboard shell with MobX, IndexedDB, optimistic writes, and background sync.
 
-Use Cloudflare Workers as the application runtime, D1 as the authoritative relational database, Durable Objects as per-workspace or per-document coordination actors, and Queues for async side effects. Do not use Queues for low-latency multiplayer fanout.
+Use D1 for app-owned auth data and the canonical relational application database. Choose the rest of the Cloudflare resources by product need. Workers and Static Assets are the default runtime and delivery layer, Durable Objects are appropriate for realtime coordination, and Queues are appropriate for async side effects. Do not force a Cloudflare service into the design when the product requirement does not need it.
 
 ## Source Freshness
 
@@ -54,6 +57,8 @@ Before relying on API signatures, compatibility flags, limits, or framework supp
 - Cloudflare D1 Workers Binding API.
 - Cloudflare Durable Objects WebSockets and storage.
 - Cloudflare Queues JavaScript APIs.
+- Better Auth database adapters and organization plugin.
+- Turborepo workspace configuration.
 - MobX React integration.
 - ShadCN theming.
 - Base UI component APIs.
@@ -69,10 +74,12 @@ Use:
 - Vite.
 - MobX and `mobx-react-lite`.
 - IndexedDB through a typed wrapper such as Dexie unless the repo already has a preferred local database layer.
-- Cloudflare Workers with Static Assets.
-- D1 for canonical data.
-- Durable Objects for workspace, room, document, or board coordination.
-- Cloudflare Queues for async side effects.
+- Turborepo monorepo with `apps/*` and `packages/*`.
+- Cloudflare Workers with Static Assets as the default deployment target.
+- D1 for auth, organization, membership, and canonical application data.
+- Better Auth with the organization plugin for authentication and authorization.
+- Optional Durable Objects for organization, room, document, or board coordination.
+- Optional Cloudflare Queues for async side effects.
 - ShadCN-style owned components.
 - Base UI primitives for accessible headless behavior.
 - Tailwind and CSS custom properties for tokenized styling.
@@ -84,6 +91,23 @@ Avoid:
 - Treating Queues as realtime fanout.
 - Putting auth tokens in IndexedDB.
 - Building new UI primitives outside the design system.
+- Starting from a single-package app when the goal is a reusable application framework.
+
+## Monorepo Structure
+
+Use Turborepo as the default repository shape.
+
+Prefer:
+
+- `apps/web`: React marketing pages and dashboard shell.
+- `apps/worker`: Cloudflare Worker routes, auth handlers, sync APIs, and service bindings when kept separate from the web build.
+- `packages/auth`: Better Auth configuration, organization plugin setup, permission helpers, and shared auth types.
+- `packages/db`: D1 schema, migrations, query helpers, and typed database access.
+- `packages/sync`: client/server sync primitives, local outbox helpers, and conflict policy helpers.
+- `packages/ui`: ShadCN/Base UI-derived components and token definitions.
+- `packages/config`: shared TypeScript, lint, Tailwind, and build config.
+
+Keep framework guidance flexible. Co-locate `apps/web` and Worker code when the chosen Cloudflare integration makes that simpler, but keep auth, database, sync, and UI primitives in packages so agents do not couple product screens to infrastructure details.
 
 ## Route Model
 
@@ -130,7 +154,7 @@ Use MobX for shared domain state, sync state, and high-churn collaborative state
 
 Create stores by responsibility:
 
-- `SessionStore`: authenticated user, workspace membership, auth freshness.
+- `SessionStore`: authenticated user, active organization, organization membership, auth freshness.
 - `DomainStore`: normalized entities from IndexedDB and server deltas.
 - `SyncStore`: local cursor, mutation queue state, network state, conflict state.
 - `PresenceStore`: online collaborators, selections, cursors, transient room state.
@@ -150,7 +174,7 @@ Use IndexedDB as a local replica, not as an independent source of truth.
 
 Persist:
 
-- Entity snapshots scoped by account, workspace, and table.
+- Entity snapshots scoped by account, organization, and table.
 - Sync cursors.
 - Durable outbox mutations.
 - Client device ID.
@@ -163,110 +187,59 @@ Do not persist:
 - Raw OAuth tokens.
 - Password material.
 - Sensitive fields not needed for offline use.
-- Cross-workspace data without a workspace partition key.
+- Cross-organization data without an organization partition key.
 
-Every local table must include enough metadata for sync:
+Every local table should include enough metadata to support organization scoping, server reconciliation, soft deletion when needed, and local pending state.
 
-- `id`
-- `workspaceId`
-- `serverVersion`
-- `updatedAt`
-- `deletedAt`
-- `localStatus`
-
-Every outbox entry must include:
-
-- `mutationId`
-- `deviceId`
-- `clientSeq`
-- `workspaceId`
-- `entityType`
-- `entityId`
-- `op`
-- `payload`
-- `baseVersion`
-- `createdAt`
-- `attempts`
-- `lastError`
+Every outbox entry should include enough metadata to support idempotency, retry, organization authorization, conflict detection, and user-visible error recovery.
 
 ## Sync Protocol
 
-Use a mutation-log sync protocol.
+Use a local-first sync shape without prescribing exact endpoint payloads or tables.
 
-Client push flow:
+The architecture should include:
 
-1. Generate `mutationId = deviceId + ":" + clientSeq`.
-2. Apply the mutation to MobX state immediately.
-3. Persist the mutation to IndexedDB outbox.
-4. Send a batch to `/sync/push`.
-5. Worker authenticates the user and validates workspace membership.
-6. Worker routes the batch to the workspace Durable Object.
-7. Durable Object serializes mutations for that workspace or document.
-8. Durable Object writes canonical changes and `sync_operations` rows to D1.
-9. Durable Object broadcasts accepted deltas to connected clients.
-10. Durable Object or Worker enqueues async side effects to Queues.
-11. Client receives ack, records committed server versions, and removes outbox entries.
+- An IndexedDB local replica for the active organization.
+- A durable local outbox for optimistic mutations.
+- A server-side authority path that authenticates the session and checks organization membership before accepting changes.
+- Idempotent mutation handling so retries are safe.
+- A durable cursor or version strategy so clients can fetch missed changes after reload or reconnect.
+- A conflict policy appropriate to the product domain.
+- Optional realtime delivery when another user should see changes immediately.
 
-Client pull flow:
-
-1. Read local cursor from IndexedDB.
-2. Call `/sync/pull?workspaceId=...&since=...`.
-3. Worker authenticates and validates membership.
-4. Worker reads committed `sync_operations` from D1.
-5. Client applies deltas idempotently.
-6. Client advances cursor only after IndexedDB commit succeeds.
-
-Reconnect flow:
-
-1. Open dashboard shell from local IndexedDB.
-2. Start WebSocket for live room updates.
-3. Pull missed deltas from D1 using the last durable cursor.
-4. Resume outbox pushes.
-5. Resolve conflicts before clearing affected local mutations.
+Prefer D1 as the durable authority for committed application state. Use Durable Objects only when the product needs serialized coordination, presence, low-latency fanout, or WebSocket rooms. Use Queues only for async side effects after the primary write is accepted.
 
 ## Server Data Model
 
-Use D1 as the canonical database.
+Use D1 as the canonical relational database for auth, organizations, memberships, and application data.
 
-Prefer STRICT SQLite tables where practical. Use prepared statements and typed result rows.
+Prefer:
 
-Minimum tables:
+- STRICT SQLite tables where practical.
+- Prepared statements and typed result rows.
+- Foreign keys for ownership and membership boundaries.
+- Organization-scoped application records.
+- Durable idempotency records for client mutations when offline or retry behavior exists.
 
-- `users`
-- `accounts` or `identities`
-- `sessions`
-- `workspaces`
-- `workspace_members`
-- domain tables such as `issues`, `projects`, or `documents`
-- `sync_operations`
-- `mutation_receipts`
-- `audit_events`
-
-`sync_operations` should include:
-
-- `opId`
-- `workspaceId`
-- `entityType`
-- `entityId`
-- `operation`
-- `payload`
-- `actorUserId`
-- `deviceId`
-- `clientSeq`
-- `serverVersion`
-- `createdAt`
-
-Use `mutation_receipts` for idempotency. A repeated `mutationId` must return the same committed result, not reapply the mutation.
+Do not prescribe a product data model in this skill. The agent should derive domain entities from the user's app request, but every multi-user entity must belong to an organization or to a child scope of an organization.
 
 ## Durable Objects
 
-Use Durable Objects for coordination atoms:
+Use Durable Objects only when coordination is actually needed.
 
-- One object per workspace for general sync.
-- One object per document, board, canvas, or high-churn room when a workspace object would bottleneck.
-- Never one global object for all tenants.
+Good fits:
 
-Durable Objects own:
+- One object per organization for general sync.
+- One object per document, board, canvas, or high-churn room when an organization object would bottleneck.
+- Realtime presence, multiplayer cursors, collaborative editing rooms, serialized command handling, or low-latency WebSocket fanout.
+
+Avoid:
+
+- One global object for all tenants.
+- Durable Objects for ordinary CRUD that D1 can handle.
+- Durable Objects when polling, pull sync, or plain Worker routes are sufficient.
+
+When used, Durable Objects may own:
 
 - Mutation ordering inside their coordination atom.
 - WebSocket room membership.
@@ -290,15 +263,15 @@ Batch high-frequency messages. Prefer one envelope containing multiple logical m
 
 ## Multiplayer
 
-Use WebSockets through Durable Objects for multiplayer and presence.
+Use WebSockets through Durable Objects for multiplayer and presence when the product needs live collaboration.
 
 Connection flow:
 
-1. Client requests `/sync/ws?workspaceId=...&roomId=...`.
-2. Worker validates method, upgrade headers, session cookie, workspace membership, and room access.
+1. Client requests `/sync/ws?organizationId=...&roomId=...`.
+2. Worker validates method, upgrade headers, session cookie, organization membership, and room access.
 3. Worker routes to the Durable Object by deterministic name.
 4. Durable Object accepts the WebSocket.
-5. Durable Object attaches user ID, workspace ID, room ID, connection ID, and joined timestamp.
+5. Durable Object attaches user ID, organization ID, room ID, connection ID, and joined timestamp.
 6. Durable Object sends bootstrap metadata and current presence.
 7. Client pulls missed durable deltas by cursor.
 
@@ -311,7 +284,7 @@ Do not use presence as authorization evidence.
 
 ## Queues
 
-Use Cloudflare Queues for asynchronous work that does not need to complete before UI feedback:
+Use Cloudflare Queues only for asynchronous work that does not need to complete before UI feedback:
 
 - Email.
 - Webhooks.
@@ -322,30 +295,50 @@ Use Cloudflare Queues for asynchronous work that does not need to complete befor
 - AI background jobs.
 - Cleanup and retry work.
 
-Queue messages must be idempotent. Include a stable job ID, workspace ID, actor ID, entity IDs, and originating mutation ID.
+Queue messages must be idempotent. Include a stable job ID, organization ID, actor ID, entity IDs, and originating mutation ID.
 
 Do not queue the primary write path if the user expects immediate collaborative visibility. Commit through the Durable Object and D1 first, then enqueue side effects.
 
 ## Authentication
 
-Use app-owned authentication for customer-facing SaaS.
+Use Better Auth as the default app-owned authentication layer for customer-facing SaaS.
 
-Default requirements:
+Configure Better Auth with:
 
+- D1-backed database storage. Prefer the built-in SQLite/D1-capable path or a Drizzle SQLite adapter when the project standardizes on Drizzle.
+- Organization plugin enabled on server and client.
 - HttpOnly, Secure, SameSite cookies.
-- D1-backed sessions.
-- D1-backed users, identities, and workspace memberships.
 - CSRF protection for cookie-authenticated writes.
-- Session rotation on login and privilege change.
-- Logout that invalidates the server session and clears local IndexedDB workspace data.
-- Auth checks in Worker routes before touching D1, Queues, or Durable Objects.
-- Membership checks before every workspace-scoped read, write, and WebSocket upgrade.
+- Session rotation on login and privilege changes.
+- Logout that invalidates the server session and clears local IndexedDB data for the affected user and organization.
+- Turnstile on signup, login, invitation acceptance, or passwordless email request flows when bot abuse is plausible.
 
 Use Cloudflare Access for internal admin surfaces or private preview environments, not as the default customer auth system.
 
-Use Turnstile on signup, login, invitation acceptance, or passwordless email request flows when bot abuse is plausible.
+Do not create bespoke session, membership, invitation, or role systems unless Better Auth cannot satisfy a documented requirement.
 
-Do not store auth secrets or bearer tokens in IndexedDB. Keep local data scoped by user ID, account ID, and workspace ID so logout and account switch can clear the right data.
+## Organizations And Authorization
+
+Make organizations mandatory.
+
+Rules:
+
+- Every user must belong to at least one organization.
+- Create a personal organization for each new user during onboarding.
+- Product data must be organization-scoped unless it is explicitly global public marketing content.
+- The active organization must be explicit in the dashboard UI and request context.
+- Organization membership must be checked before every organization-scoped read, write, sync pull, sync push, and WebSocket upgrade.
+- Authorization must be expressed through the auth library's organization and access-control system.
+
+Do not hard-code a universal role list in this skill. Instead:
+
+- Define roles and permissions from the product domain.
+- Keep roles organization-scoped.
+- Use Better Auth organization access control for static role sets.
+- Consider Better Auth dynamic access control only when the product needs organization-specific custom roles.
+- Keep server-side permission checks authoritative. Client checks are for affordances only.
+
+The default mental model is: user owns identity, organization owns data, membership grants access, role grants capability.
 
 ## Conflict Handling
 
@@ -424,22 +417,20 @@ Generate:
 - Open Graph metadata.
 - structured data only when it reflects visible public content.
 
-## Verification
+## Completion Review
 
-Before finishing a generated app or feature:
+Before finishing, confirm the architecture follows the guide:
 
-- Build the app.
-- Run typecheck.
-- Run tests when present.
-- Run D1 migrations locally or against the intended environment.
-- Verify marketing HTML exists for public routes.
-- Verify `/app/*` is not indexed.
-- Verify auth blocks API, sync, and WebSocket access without a valid session.
-- Verify one optimistic mutation through IndexedDB, Worker, Durable Object, D1, WebSocket broadcast, and ack cleanup.
-- Verify offline mutation persistence and reconnect flush.
-- Verify repeated mutation IDs are idempotent.
-- Verify Queue consumers tolerate duplicate messages.
-- Verify MobX observer components rerender only for relevant observable reads.
-- Verify token changes update ShadCN/Base UI-derived components without component rewrites.
+- The repository is a Turborepo monorepo with clear `apps/*` and `packages/*` boundaries.
+- D1 is the chosen store for auth, organizations, memberships, and canonical relational app data.
+- Better Auth owns sessions, organizations, invitations, membership, and role or permission checks.
+- Every authenticated user gets a personal organization.
+- Every multi-user product record is organization-scoped.
+- Cloudflare resources beyond D1 are selected by need, not by default.
+- Marketing routes are prerendered and indexable.
+- Dashboard routes are client-only and noindexed.
+- IndexedDB state is local-only, scoped by user and organization, and contains no auth secrets.
+- MobX stores are organized by session, domain, sync, presence, and UI responsibilities.
+- ShadCN/Base UI components are token-based and can be rethemed without component rewrites.
 
-Report what was verified and what remains unverified.
+Report important deviations and why they were chosen.
