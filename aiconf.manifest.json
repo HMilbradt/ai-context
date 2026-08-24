@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.0",
+  "minimumCliVersion": "0.1.0",
+  "sources": [
+    {
+      "id": "global-instructions",
+      "kind": "file",
+      "source": ".agents/AGENTS.md",
+      "mode": 420,
+      "targets": [
+        { "tool": "universal", "path": ".agents/AGENTS.md" },
+        { "tool": "codex", "path": ".codex/AGENTS.md" },
+        { "tool": "claude", "path": ".claude/CLAUDE.md" }
+      ]
+    },
+    {
+      "id": "skill.performance-first-app-builder",
+      "kind": "tree",
+      "source": ".agents/skills/performance-first-app-builder",
+      "mode": 420,
+      "targets": [
+        {
+          "tool": "universal",
+          "path": ".agents/skills/performance-first-app-builder"
+        },
+        {
+          "tool": "claude",
+          "path": ".claude/skills/performance-first-app-builder"
+        }
+      ]
+    },
+    {
+      "id": "skill.react-mobx-cloudflare-app-builder",
+      "kind": "tree",
+      "source": ".agents/skills/react-mobx-cloudflare-app-builder",
+      "mode": 420,
+      "targets": [
+        {
+          "tool": "universal",
+          "path": ".agents/skills/react-mobx-cloudflare-app-builder"
+        },
+        {
+          "tool": "claude",
+          "path": ".claude/skills/react-mobx-cloudflare-app-builder"
+        }
+      ]
+    },
+    {
+      "id": "skill.agent-browser",
+      "kind": "tree",
+      "source": ".agents/skills/agent-browser",
+      "mode": 420,
+      "targets": [
+        {
+          "tool": "universal",
+          "path": ".agents/skills/agent-browser"
+        },
+        {
+          "tool": "claude",
+          "path": ".claude/skills/agent-browser"
+        }
+      ]
+    }
+  ]
+}

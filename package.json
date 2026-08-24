@@ -1,0 +1,54 @@
+{
+  "name": "@hmilbradt/aiconf",
+  "version": "0.1.0",
+  "description": "Review and safely synchronize global AI agent configuration.",
+  "type": "module",
+  "bin": {
+    "aiconf": "dist/cli.js"
+  },
+  "files": [
+    "dist/*.js",
+    "dist/*.js.map",
+    "dist/*.d.ts",
+    "dist/*.d.ts.map",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HMilbradt/ai-context.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "bundle": "tsx scripts/build-bundle.ts",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "check:package": "tsx scripts/check-package.ts",
+    "lint": "oxlint src scripts test",
+    "prebuild": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "smoke:pack": "tsx scripts/smoke-pack.ts",
+    "test": "tsx --test test/*.test.ts",
+    "verify": "npm run check && npm run lint && npm test && npm run build && npm run bundle && npm run check:package && npm run smoke:pack",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "diff": "^9.0.0",
+    "picocolors": "^1.1.1",
+    "semver": "^7.8.5",
+    "tar": "^7.5.22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/semver": "^7.7.1",
+    "oxlint": "^1.48.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

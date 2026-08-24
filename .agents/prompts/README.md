@@ -1,4 +1,4 @@
-# prompts/
+# .agents/prompts/
 
 Reusable prompt snippets. Plain markdown. Paste into any chat, or reference from a skill/command.
 
