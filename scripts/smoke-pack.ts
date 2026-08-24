@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -11,17 +11,9 @@ const temporary = await mkdtemp(path.join(tmpdir(), "aiconf-pack-smoke-"));
 const prefix = path.join(temporary, "prefix");
 
 try {
-  const { stdout } = await execFileAsync(
-    npm,
-    ["pack", "--json", "--ignore-scripts", "--pack-destination", temporary],
-    { cwd: root, maxBuffer: 10 * 1024 * 1024 },
-  );
-  const packed = JSON.parse(stdout) as Array<{ filename?: unknown }>;
-  const filename = packed[0]?.filename;
-  if (typeof filename !== "string") {
-    throw new Error("npm pack did not report its archive filename");
-  }
-  await execFileAsync(npm, ["install", "-g", "--prefix", prefix, path.join(temporary, filename)], {
+  const archive = path.join(root, "dist/release/aiconf-cli.tgz");
+  await access(archive);
+  await execFileAsync(npm, ["install", "-g", "--prefix", prefix, archive], {
     cwd: temporary,
     maxBuffer: 10 * 1024 * 1024,
   });

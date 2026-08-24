@@ -11,7 +11,6 @@ concurrency:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   publish:
@@ -22,34 +21,25 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false
       - run: npm ci
       - name: Check tag and package versions
         run: |
           node -e 'const p=require("./package.json"); const m=require("./aiconf.manifest.json"); const tag=process.env.GITHUB_REF_NAME; if (tag !== `v${p.version}` || p.version !== m.version) { throw new Error(`Tag ${tag}, package ${p.version}, and bundle ${m.version} must match`) }'
       - run: npm run verify
-      - name: Create draft release and upload verified bundle
+      - name: Create draft release and upload verified artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
           fi
-          gh release upload "$GITHUB_REF_NAME" "dist/release/aiconf-$GITHUB_REF_NAME.tar.gz" "dist/release/aiconf-$GITHUB_REF_NAME.tar.gz.sha256" --clobber
-      - name: Publish public npm package with OpenID Connect
-        run: |
-          package_name=$(node -p 'require("./package.json").name')
-          package_version=$(node -p 'require("./package.json").version')
-          if published_head=$(npm view "$package_name@$package_version" gitHead 2>/dev/null); then
-            if [ "$published_head" != "$GITHUB_SHA" ]; then
-              echo "npm already has $package_name@$package_version from a different Git commit" >&2
-              exit 1
-            fi
-            echo "$package_name@$package_version is already published from this Git commit"
-          else
-            npm publish --access public
-          fi
+          gh release upload "$GITHUB_REF_NAME" \
+            "dist/release/aiconf-$GITHUB_REF_NAME.tar.gz" \
+            "dist/release/aiconf-$GITHUB_REF_NAME.tar.gz.sha256" \
+            "dist/release/aiconf-cli.tgz" \
+            "dist/release/aiconf-cli.tgz.sha256" \
+            --clobber
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

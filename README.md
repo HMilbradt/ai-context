@@ -9,7 +9,7 @@ It installs shared instructions, portable skills, tool-specific agents and comma
 Node.js 22 or newer is required. macOS and Linux are supported.
 
 ```bash
-npm install -g @hmilbradt/aiconf
+npm install -g https://github.com/HMilbradt/ai-context/releases/latest/download/aiconf-cli.tgz
 aiconf setup
 ```
 
@@ -117,27 +117,9 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow verifies the repository, builds the bundle and checksum, creates a draft GitHub Release, publishes the public npm package, then publishes the GitHub Release. OpenID Connect is used for npm authentication, so no long-lived registry token is stored.
+The release workflow verifies the repository, builds the configuration bundle, packs the command, creates a draft GitHub Release, uploads all artifacts and checksums, then publishes the GitHub Release. Nothing is published to the npm registry.
 
-Before the first automated release:
-
-1. Confirm `@hmilbradt/aiconf` is still available.
-2. Publish the first public scoped version manually with two-factor authentication, because npm requires a package to exist before its trusted publisher can be configured.
-3. In the npm package settings, configure the GitHub Actions trusted publisher for user `HMilbradt`, repository `ai-context`, and workflow file `release.yml`.
-4. Allow the `npm publish` action for that trusted publisher.
-5. Tag the exact commit used for the manual publication. The workflow verifies npm's published Git commit before skipping the already-published version.
-
-Use these commands for the one-time publication after the commit is final:
-
-```bash
-npm view @hmilbradt/aiconf
-npm run verify
-npm publish --access public
-```
-
-The first command should return npm's not-found response. Stop if it reports an existing package that you did not publish.
-
-The workflow uses `npm publish --access public`. Scoped packages otherwise default to private visibility.
+The stable command asset is always named `aiconf-cli.tgz`. This gives the installation command a version-independent GitHub URL.
 
 ## Tool documentation
 
@@ -146,8 +128,6 @@ The workflow uses `npm publish --access public`. Scoped packages otherwise defau
 - [Claude Code memory](https://code.claude.com/docs/en/memory)
 - [Claude Code skills](https://code.claude.com/docs/en/skills)
 - [Cursor skills](https://prod.cursor.com/docs/skills)
-- [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
-- [npm public scoped packages](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/)
 
 ## License
 

@@ -17,9 +17,6 @@
   "engines": {
     "node": ">=22"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/HMilbradt/ai-context.git"
@@ -28,13 +25,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "bundle": "tsx scripts/build-bundle.ts",
+    "bundle:cli": "tsx scripts/build-cli-package.ts",
     "check": "tsc -p tsconfig.json --noEmit",
     "check:package": "tsx scripts/check-package.ts",
     "lint": "oxlint src scripts test",
     "prebuild": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "smoke:pack": "tsx scripts/smoke-pack.ts",
     "test": "tsx --test test/*.test.ts",
-    "verify": "npm run check && npm run lint && npm test && npm run build && npm run bundle && npm run check:package && npm run smoke:pack",
+    "verify": "npm run check && npm run lint && npm test && npm run build && npm run bundle && npm run bundle:cli && npm run check:package && npm run smoke:pack",
     "prepack": "npm run build"
   },
   "dependencies": {
