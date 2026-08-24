@@ -1,6 +1,7 @@
 import { lstat, readFile } from "node:fs/promises";
 
 import { sha256 } from "./hash.js";
+import { configurationIdForArtifact, targetEnabled } from "./configurations.js";
 import {
   assertToolTargetPath,
   assertExistingPathSafe,
@@ -45,10 +46,6 @@ async function readCurrent(home: string, destination: string): Promise<CurrentFi
   }
 }
 
-function toolSelected(tool: ToolTarget, selectedTools: Set<ToolTarget>): boolean {
-  return tool === "universal" || tool === "scripts" || selectedTools.has(tool);
-}
-
 function classifyDesired(
   currentHash: string | null,
   desiredHash: string,
@@ -72,9 +69,15 @@ function classifyDesired(
   return "conflicting";
 }
 
-function reasonFor(status: ChangeStatus, scriptCollision = false): string {
-  if (scriptCollision) {
+function reasonFor(
+  status: ChangeStatus,
+  options: { scriptCollision?: boolean; previouslyManaged?: boolean } = {},
+): string {
+  if (options.scriptCollision) {
     return "An unmanaged command already uses this name";
+  }
+  if (status === "conflicting" && options.previouslyManaged === false) {
+    return "An unmanaged file already exists with different content";
   }
   const reasons: Record<ChangeStatus, string> = {
     unchanged: "Destination already matches this release",
@@ -94,7 +97,7 @@ export async function buildChangePlan(input: BuildChangePlanInput): Promise<Plan
 
   for (const artifact of input.artifacts) {
     for (const target of artifact.targets) {
-      if (!toolSelected(target.tool, selectedTools)) {
+      if (!targetEnabled(target.tool, selectedTools)) {
         continue;
       }
       assertToolTargetPath(target.tool, target.path);
@@ -111,6 +114,7 @@ export async function buildChangePlan(input: BuildChangePlanInput): Promise<Plan
       const status = scriptCollision ? "conflicting" : classifiedStatus;
       plan.push({
         key,
+        configurationId: configurationIdForArtifact(artifact.id),
         artifactId: artifact.id,
         tool: target.tool,
         targetPath: target.path,
@@ -125,7 +129,10 @@ export async function buildChangePlan(input: BuildChangePlanInput): Promise<Plan
         mode: artifact.mode,
         recommended: status === "new" || status === "safely-updatable",
         selectable: status !== "unchanged" && !scriptCollision,
-        reason: reasonFor(status, scriptCollision),
+        reason: reasonFor(status, {
+          scriptCollision,
+          previouslyManaged: previous !== undefined,
+        }),
       });
     }
   }
@@ -141,6 +148,7 @@ export async function buildChangePlan(input: BuildChangePlanInput): Promise<Plan
       current.hash === null || current.hash === previous.sha256 ? "removed-upstream" : "conflicting";
     plan.push({
       key,
+      configurationId: configurationIdForArtifact(previous.artifactId),
       artifactId: previous.artifactId,
       tool: previous.tool,
       targetPath: previous.path,

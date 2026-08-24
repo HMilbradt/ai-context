@@ -4,6 +4,7 @@ import path from "node:path";
 import { valid as validSemver } from "semver";
 
 import { assertToolTargetPath, stateKey } from "./paths.js";
+import { configurationIdForArtifact, targetEnabled } from "./configurations.js";
 import {
   TOOL_TARGETS,
   type ManagedEntryV1,
@@ -68,11 +69,26 @@ function validateState(value: unknown): ManagedStateV1 {
   if (new Set(tools).size !== tools.length || !isRecord(value.managed)) {
     throw new Error("State tools or managed entries are malformed");
   }
+  let configurations: Record<string, boolean> | null = null;
+  if (value.configurations !== undefined) {
+    if (!isRecord(value.configurations)) {
+      throw new Error("State configuration preferences are malformed");
+    }
+    configurations = Object.fromEntries(
+      Object.entries(value.configurations).map(([id, selected]) => {
+        if (id.length === 0 || typeof selected !== "boolean") {
+          throw new Error("State configuration preferences are malformed");
+        }
+        return [id, selected];
+      }),
+    );
+  }
   return {
     schemaVersion: 1,
     installedVersion: optionalVersion(value.installedVersion, "installed version"),
     lastCheckedVersion: optionalVersion(value.lastCheckedVersion, "last checked version"),
     tools,
+    configurations,
     managed: Object.fromEntries(
       Object.entries(value.managed).map(([key, entry]) => [key, managedEntry(key, entry)]),
     ),
@@ -85,6 +101,7 @@ export function emptyState(): ManagedStateV1 {
     installedVersion: null,
     lastCheckedVersion: null,
     tools: [],
+    configurations: {},
     managed: {},
   };
 }
@@ -157,13 +174,26 @@ export function buildNextState(input: {
   selectedKeys: Set<string>;
   bundleVersion: string;
   tools: ToolTarget[];
+  configurations: Record<string, boolean>;
 }): ManagedStateV1 {
+  const selectedTools = new Set(input.tools);
+  const selectedConfigurationIds = new Set(
+    Object.entries(input.configurations)
+      .filter(([, selected]) => selected)
+      .map(([id]) => id),
+  );
   const next: ManagedStateV1 = {
     ...(input.previous ?? emptyState()),
     schemaVersion: 1,
     lastCheckedVersion: input.bundleVersion,
     tools: [...input.tools],
-    managed: { ...input.previous?.managed },
+    configurations: { ...input.configurations },
+    managed: Object.fromEntries(
+      Object.entries(input.previous?.managed ?? {}).filter(([, entry]) =>
+        selectedConfigurationIds.has(configurationIdForArtifact(entry.artifactId)) &&
+        targetEnabled(entry.tool, selectedTools),
+      ),
+    ),
   };
 
   let complete = true;

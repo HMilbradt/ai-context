@@ -4,6 +4,12 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { gte as semverGte } from "semver";
 
+import {
+  collectConfigurations,
+  configurationIdForArtifact,
+  resolveConfigurationPreferences,
+  stateForSelection,
+} from "./configurations.js";
 import { findExecutableOnPath } from "./external-tools.js";
 import { sha256 } from "./hash.js";
 import { getPackageVersion } from "./package-info.js";
@@ -28,6 +34,7 @@ import type {
 } from "./types.js";
 import {
   UserCancelledError,
+  chooseConfigurations,
   chooseTools,
   createSpinner,
   finishInterface,
@@ -131,24 +138,46 @@ async function synchronize(setup: boolean): Promise<void> {
       successMessage: (candidate) => `Found aiconf release ${candidate.info.version}`,
     });
 
-    const agentBrowser = await findExecutableOnPath(
-      "agent-browser",
-      process.env.PATH ?? "",
+    const configurations = collectConfigurations(release.artifacts, tools);
+    const configurationPreferences = await chooseConfigurations({
+      configurations,
+      preferences: resolveConfigurationPreferences(configurations, previous),
+      setup,
+    });
+    const selectedConfigurationIds = new Set(
+      Object.entries(configurationPreferences)
+        .filter(([, selected]) => selected)
+        .map(([id]) => id),
     );
-    if (agentBrowser) {
-      info(`agent-browser detected at ${agentBrowser}`);
-    } else {
-      warn(
-        "agent-browser was not detected on PATH. Install it separately before using the bundled agent-browser skill.",
+
+    if (selectedConfigurationIds.has("skill.agent-browser")) {
+      const agentBrowser = await findExecutableOnPath(
+        "agent-browser",
+        process.env.PATH ?? "",
       );
+      if (agentBrowser) {
+        info(`agent-browser detected at ${agentBrowser}`);
+      } else {
+        warn(
+          "agent-browser was not detected on PATH. Install it separately before using the bundled agent-browser skill.",
+        );
+      }
     }
+    const selectedArtifacts = release.artifacts.filter((artifact) =>
+      selectedConfigurationIds.has(configurationIdForArtifact(artifact.id)),
+    );
     const plan = await buildChangePlan({
       home,
-      artifacts: release.artifacts,
-      state: previous,
+      artifacts: selectedArtifacts,
+      state: stateForSelection(previous, selectedConfigurationIds, new Set(tools)),
       selectedTools: tools,
     });
-    const selected = await reviewChangePlan(plan);
+    const selected = await reviewChangePlan(
+      plan,
+      configurations.filter((configuration) =>
+        selectedConfigurationIds.has(configuration.id),
+      ),
+    );
     const operations = operationsFor(plan, selected);
 
     const transaction = await applyFileTransaction({
@@ -162,6 +191,7 @@ async function synchronize(setup: boolean): Promise<void> {
       selectedKeys: selected,
       bundleVersion: release.info.version,
       tools,
+      configurations: configurationPreferences,
     });
     try {
       await writeState(paths.stateFile, nextState);
@@ -178,7 +208,7 @@ async function synchronize(setup: boolean): Promise<void> {
       finishInterface(`Installed aiconf configuration ${release.info.version}`);
     } else {
       finishInterface(
-        `Applied ${operations.length} change${operations.length === 1 ? "" : "s"}. Conflicts remain, so the release is not fully installed.`,
+        `Applied ${operations.length} file change${operations.length === 1 ? "" : "s"}. Some selected configurations remain incomplete.`,
       );
     }
   });
@@ -235,6 +265,18 @@ export async function runStatus(): Promise<number> {
   } else {
     info(`installed configuration: ${state.installedVersion ?? "partial"}`);
     info(`selected tools: ${state.tools.join(", ") || "universal only"}`);
+    if (state.configurations !== null) {
+      const selectedConfigurations = Object.entries(state.configurations)
+        .filter(([, selected]) => selected)
+        .map(([id]) => id);
+      const skippedConfigurations = Object.entries(state.configurations)
+        .filter(([, selected]) => !selected)
+        .map(([id]) => id);
+      info(`selected configurations: ${selectedConfigurations.join(", ") || "none"}`);
+      if (skippedConfigurations.length > 0) {
+        info(`skipped configurations: ${skippedConfigurations.join(", ")}`);
+      }
+    }
     problems.push(...(await inspectStateDrift(home, state)));
   }
 
@@ -248,13 +290,15 @@ export async function runStatus(): Promise<number> {
     problems.push(`release check failed: ${(error as Error).message}`);
   }
 
-  const agentBrowser = await findExecutableOnPath("agent-browser", process.env.PATH ?? "");
-  if (agentBrowser) {
-    info(`agent-browser: detected at ${agentBrowser}`);
-  } else {
-    warn(
-      "Optional agent-browser command was not detected on PATH. Install it separately before using its skill.",
-    );
+  if (!state || state.configurations?.["skill.agent-browser"] !== false) {
+    const agentBrowser = await findExecutableOnPath("agent-browser", process.env.PATH ?? "");
+    if (agentBrowser) {
+      info(`agent-browser: detected at ${agentBrowser}`);
+    } else {
+      warn(
+        "Optional agent-browser command was not detected on PATH. Install it separately before using its skill.",
+      );
+    }
   }
 
   const localBin = path.join(home, ".local/bin");

@@ -60,7 +60,15 @@ export interface ManagedStateV1 {
   installedVersion: string | null;
   lastCheckedVersion: string | null;
   tools: ToolTarget[];
+  configurations: Record<string, boolean> | null;
   managed: Record<string, ManagedEntryV1>;
+}
+
+export interface ConfigurationDefinition {
+  id: string;
+  sourcePath: string;
+  selectedTools: ToolTarget[];
+  targets: ArtifactTarget[];
 }
 
 export type ChangeStatus =
@@ -73,6 +81,7 @@ export type ChangeStatus =
 
 export interface PlannedChange {
   key: string;
+  configurationId: string;
   artifactId: string;
   tool: ToolTarget;
   targetPath: string;

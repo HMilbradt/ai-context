@@ -52,6 +52,7 @@ describe("configuration synchronization", () => {
       selectedKeys: selected,
       bundleVersion: "0.1.0",
       tools: ["codex"],
+      configurations: { instructions: true },
     });
     assert.equal(await readFile(thirdParty, "utf8"), "third party");
     assert.equal(await readFile(path.join(home, ".codex/AGENTS.md"), "utf8"), content.toString());
@@ -95,6 +96,7 @@ describe("configuration synchronization", () => {
       selectedKeys: safeSelection,
       bundleVersion: "0.2.0",
       tools: ["codex"],
+      configurations: { instructions: true },
     });
     assert.equal(partialState.installedVersion, "0.1.0");
 
@@ -124,6 +126,7 @@ describe("configuration synchronization", () => {
       selectedKeys: new Set([conflict.key]),
       bundleVersion: "0.2.0",
       tools: ["codex"],
+      configurations: { instructions: true },
     });
     const finalPlan = await buildChangePlan({
       home,

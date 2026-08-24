@@ -10,6 +10,7 @@ import type { PlannedChange } from "../src/types.js";
 function change(overrides: Partial<PlannedChange> = {}): PlannedChange {
   return {
     key: "codex:.codex/AGENTS.md",
+    configurationId: "instructions",
     artifactId: "instructions",
     tool: "codex",
     targetPath: ".codex/AGENTS.md",
@@ -39,6 +40,7 @@ describe("managed state", () => {
       selectedKeys: new Set(),
       bundleVersion: "0.2.0",
       tools: ["codex"],
+      configurations: { instructions: true },
     });
     assert.equal(next.installedVersion, "0.1.0");
     assert.equal(next.lastCheckedVersion, "0.2.0");
@@ -58,9 +60,72 @@ describe("managed state", () => {
       selectedKeys: new Set([updated.key]),
       bundleVersion: "0.1.0",
       tools: ["codex", "claude"],
+      configurations: { instructions: true },
     });
     assert.equal(next.installedVersion, "0.1.0");
     assert.equal(Object.keys(next.managed).length, 2);
+  });
+
+  it("loads legacy state without source configuration preferences", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "aiconf-state-"));
+    const stateFile = path.join(root, "state.json");
+    await writeFile(
+      stateFile,
+      JSON.stringify({
+        schemaVersion: 1,
+        installedVersion: "0.1.0",
+        lastCheckedVersion: "0.1.0",
+        tools: ["codex"],
+        managed: {},
+      }),
+    );
+
+    assert.equal((await readState(stateFile))?.configurations, null);
+  });
+
+  it("forgets skipped source files without scheduling their deletion", () => {
+    const previous = emptyState();
+    previous.managed["codex:.codex/AGENTS.md"] = {
+      artifactId: "instructions",
+      tool: "codex",
+      path: ".codex/AGENTS.md",
+      sha256: "a".repeat(64),
+      mode: 0o644,
+    };
+
+    const next = buildNextState({
+      previous,
+      plan: [],
+      selectedKeys: new Set(),
+      bundleVersion: "0.2.0",
+      tools: ["codex"],
+      configurations: { instructions: false },
+    });
+
+    assert.deepEqual(next.managed, {});
+    assert.deepEqual(next.configurations, { instructions: false });
+  });
+
+  it("forgets files belonging only to a deselected tool", () => {
+    const previous = emptyState();
+    previous.managed["claude:.claude/CLAUDE.md"] = {
+      artifactId: "instructions",
+      tool: "claude",
+      path: ".claude/CLAUDE.md",
+      sha256: "a".repeat(64),
+      mode: 0o644,
+    };
+
+    const next = buildNextState({
+      previous,
+      plan: [],
+      selectedKeys: new Set(),
+      bundleVersion: "0.2.0",
+      tools: ["codex"],
+      configurations: { instructions: true },
+    });
+
+    assert.deepEqual(next.managed, {});
   });
 
   it("cleans a stale lock only when its process no longer exists", async () => {

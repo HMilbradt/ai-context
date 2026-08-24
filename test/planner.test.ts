@@ -38,6 +38,7 @@ function state(
     installedVersion: "0.1.0",
     lastCheckedVersion: "0.1.0",
     tools: ["codex"],
+    configurations: { instructions: true },
     managed: {
       [`${tool}:${targetPath}`]: {
         artifactId: "instructions",
