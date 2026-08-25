@@ -4,7 +4,14 @@ import path from "node:path";
 
 import type { ToolTarget } from "./types.js";
 
-const APPROVED_ROOTS = [".agents", ".codex", ".claude", ".cursor", ".local/bin"] as const;
+const APPROVED_ROOTS = [
+  ".agents",
+  ".codex",
+  ".claude",
+  ".cursor",
+  ".config/opencode",
+  ".local/bin",
+] as const;
 
 export interface AppPaths {
   stateDir: string;
@@ -48,6 +55,7 @@ const TOOL_ROOTS: Record<ToolTarget, string> = {
   codex: ".codex",
   claude: ".claude",
   cursor: ".cursor",
+  opencode: ".config/opencode",
   scripts: ".local/bin",
 };
 

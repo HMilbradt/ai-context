@@ -31,6 +31,10 @@ describe("managed paths", () => {
       resolveManagedDestination("/home/test", ".codex/AGENTS.md"),
       "/home/test/.codex/AGENTS.md",
     );
+    assert.equal(
+      resolveManagedDestination("/home/test", ".config/opencode/AGENTS.md"),
+      "/home/test/.config/opencode/AGENTS.md",
+    );
     assert.throws(
       () => resolveManagedDestination("/home/test", ".ssh/config"),
       /approved root/i,

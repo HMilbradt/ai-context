@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "version": "0.2.0",
-  "minimumCliVersion": "0.2.0",
+  "version": "0.3.0",
+  "minimumCliVersion": "0.3.0",
   "sources": [
     {
       "id": "global-instructions",
@@ -11,7 +11,8 @@
       "targets": [
         { "tool": "universal", "path": ".agents/AGENTS.md" },
         { "tool": "codex", "path": ".codex/AGENTS.md" },
-        { "tool": "claude", "path": ".claude/CLAUDE.md" }
+        { "tool": "claude", "path": ".claude/CLAUDE.md" },
+        { "tool": "opencode", "path": ".config/opencode/AGENTS.md" }
       ]
     },
     {
@@ -27,6 +28,10 @@
         {
           "tool": "claude",
           "path": ".claude/skills/performance-first-app-builder"
+        },
+        {
+          "tool": "opencode",
+          "path": ".config/opencode/skills/performance-first-app-builder"
         }
       ]
     },
@@ -43,6 +48,10 @@
         {
           "tool": "claude",
           "path": ".claude/skills/react-mobx-cloudflare-app-builder"
+        },
+        {
+          "tool": "opencode",
+          "path": ".config/opencode/skills/react-mobx-cloudflare-app-builder"
         }
       ]
     },
@@ -59,6 +68,10 @@
         {
           "tool": "claude",
           "path": ".claude/skills/agent-browser"
+        },
+        {
+          "tool": "opencode",
+          "path": ".config/opencode/skills/agent-browser"
         }
       ]
     }

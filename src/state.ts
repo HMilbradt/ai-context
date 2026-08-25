@@ -61,7 +61,7 @@ function validateState(value: unknown): ManagedStateV1 {
     throw new Error("State file has an unsupported schema");
   }
   const tools = value.tools.map((tool) => {
-    if (tool !== "codex" && tool !== "claude" && tool !== "cursor") {
+    if (tool !== "codex" && tool !== "claude" && tool !== "cursor" && tool !== "opencode") {
       throw new Error(`State contains an unsupported selected tool: ${String(tool)}`);
     }
     return tool;

@@ -67,6 +67,7 @@ async function detectTools(home: string): Promise<Set<ToolTarget>> {
     ["codex", ".codex"],
     ["claude", ".claude"],
     ["cursor", ".cursor"],
+    ["opencode", ".config/opencode"],
   ];
   for (const [tool, relative] of checks) {
     if (await exists(path.join(home, relative))) {

@@ -1,4 +1,11 @@
-export const TOOL_TARGETS = ["universal", "codex", "claude", "cursor", "scripts"] as const;
+export const TOOL_TARGETS = [
+  "universal",
+  "codex",
+  "claude",
+  "cursor",
+  "opencode",
+  "scripts",
+] as const;
 
 export type ToolTarget = (typeof TOOL_TARGETS)[number];
 

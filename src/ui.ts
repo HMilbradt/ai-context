@@ -89,10 +89,18 @@ export async function chooseTools(detected: Set<ToolTarget>): Promise<ToolTarget
         label: "Cursor",
         ...(detected.has("cursor") ? { hint: "detected" } : {}),
       },
+      {
+        value: "opencode",
+        label: "OpenCode",
+        ...(detected.has("opencode") ? { hint: "detected" } : {}),
+      },
     ],
     initialValues: [...detected].filter(
-      (tool): tool is "codex" | "claude" | "cursor" =>
-        tool === "codex" || tool === "claude" || tool === "cursor",
+      (tool): tool is "codex" | "claude" | "cursor" | "opencode" =>
+        tool === "codex" ||
+        tool === "claude" ||
+        tool === "cursor" ||
+        tool === "opencode",
     ),
     required: false,
   });
@@ -105,6 +113,7 @@ function toolLabel(tool: ToolTarget): string {
     codex: "Codex",
     claude: "Claude Code",
     cursor: "Cursor",
+    opencode: "OpenCode",
     scripts: "Global scripts",
   };
   return labels[tool];

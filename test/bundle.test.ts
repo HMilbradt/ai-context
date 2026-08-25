@@ -17,19 +17,19 @@ describe("release bundle", () => {
     const built = await buildBundle(repositoryRoot, output);
     const archive = await readFile(built.archivePath);
     const checksum = await readFile(built.checksumPath, "utf8");
-    const archiveUrl = "https://example.test/aiconf-v0.2.0.tar.gz";
+    const archiveUrl = "https://example.test/aiconf-v0.3.0.tar.gz";
     const checksumUrl = `${archiveUrl}.sha256`;
     const apiUrl = "https://example.test/releases/latest";
     const fetcher: typeof fetch = async (input) => {
       const url = String(input);
       if (url === apiUrl) {
         return Response.json({
-          tag_name: "v0.2.0",
+          tag_name: "v0.3.0",
           draft: false,
           prerelease: false,
           assets: [
-            { name: "aiconf-v0.2.0.tar.gz", browser_download_url: archiveUrl },
-            { name: "aiconf-v0.2.0.tar.gz.sha256", browser_download_url: checksumUrl },
+            { name: "aiconf-v0.3.0.tar.gz", browser_download_url: archiveUrl },
+            { name: "aiconf-v0.3.0.tar.gz.sha256", browser_download_url: checksumUrl },
           ],
         });
       }
@@ -43,7 +43,7 @@ describe("release bundle", () => {
     };
 
     const loaded = await fetchLatestReleaseBundle(cache, fetcher, apiUrl);
-    assert.equal(loaded.manifest.version, "0.2.0");
+    assert.equal(loaded.manifest.version, "0.3.0");
     assert.equal(loaded.artifacts.length, 4);
     assert.deepEqual(
       loaded.artifacts.map((artifact) => artifact.sourcePath),
@@ -60,6 +60,26 @@ describe("release bundle", () => {
           (target) =>
             target.tool === "claude" &&
             target.path === ".claude/skills/performance-first-app-builder/SKILL.md",
+        ),
+      ),
+      true,
+    );
+    assert.equal(
+      loaded.artifacts.some((artifact) =>
+        artifact.targets.some(
+          (target) =>
+            target.tool === "opencode" &&
+            target.path === ".config/opencode/AGENTS.md",
+        ),
+      ),
+      true,
+    );
+    assert.equal(
+      loaded.artifacts.some((artifact) =>
+        artifact.targets.some(
+          (target) =>
+            target.tool === "opencode" &&
+            target.path === ".config/opencode/skills/agent-browser/SKILL.md",
         ),
       ),
       true,
